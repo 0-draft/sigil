@@ -1,0 +1,26 @@
+node_modules
+dist
+coverage
+
+# release artifacts (built locally, never committed)
+*.tgz
+*.sig
+*.crt
+*.intoto.jsonl
+audit.json
+
+# editor / os
+.DS_Store
+.vscode
+.idea
+*.swp
+*.swo
+
+# logs
+*.log
+npm-debug.log*
+
+# env (commit only .env.example)
+.env
+.env.*
+!.env.example

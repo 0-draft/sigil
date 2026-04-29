@@ -1,0 +1,60 @@
+{
+  "name": "@0-draft/sigil",
+  "version": "0.0.1",
+  "description": "a github template for repos that ship under signature, end to end.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=24"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "lint": "biome check . && markdownlint-cli2 \"**/*.md\"",
+    "format": "biome format --write .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "audit": "npm audit --audit-level=moderate",
+    "check": "npm run lint && npm run typecheck && npm run test && npm run audit && npm run build",
+    "pin-actions": "bash scripts/pin-actions.sh"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.4.13",
+    "markdownlint-cli2": "^0.22.0",
+    "typescript": "^6.0.3",
+    "vitest": "^4.0.0"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/0-draft/sigil.git"
+  },
+  "homepage": "https://github.com/0-draft/sigil",
+  "bugs": {
+    "url": "https://github.com/0-draft/sigil/issues"
+  },
+  "keywords": [
+    "supply-chain-security",
+    "sigstore",
+    "slsa",
+    "openssf",
+    "scorecard",
+    "provenance",
+    "template"
+  ]
+}

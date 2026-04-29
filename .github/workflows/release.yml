@@ -1,0 +1,139 @@
+# release flow:
+#   1. tag v* on main triggers this workflow
+#   2. build job produces a tarball + slsa provenance via the slsa-github-generator
+#      reusable workflow (which runs in an isolated builder, not in our repo's runner)
+#   3. publish job uses npm trusted publisher (oidc) to publish with --provenance
+#   4. sign job runs cosign sign-blob keylessly, identity = this workflow
+#
+# secrets used: none. there is no NPM_TOKEN. credentials are minted via oidc per run.
+
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  build:
+    name: build tarball + slsa provenance
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    outputs:
+      tarball-name: ${{ steps.pack.outputs.tarball-name }}
+      tarball-sha256: ${{ steps.pack.outputs.tarball-sha256 }}
+    steps:
+      - name: harden runner
+        uses: step-security/harden-runner@8d3c67de8e2fe68ef647c8db1e6a09f647780f40 # v2
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: 24
+          cache: npm
+          registry-url: https://registry.npmjs.org
+
+      - name: install (locked, no scripts)
+        run: npm ci --ignore-scripts
+
+      - name: build
+        run: npm run build
+
+      - name: pack
+        id: pack
+        run: |
+          set -euo pipefail
+          tarball=$(npm pack --silent | tail -n 1)
+          sha=$(shasum -a 256 "$tarball" | awk '{print $1}')
+          echo "tarball-name=$tarball" >>"$GITHUB_OUTPUT"
+          echo "tarball-sha256=$sha"   >>"$GITHUB_OUTPUT"
+
+      - name: upload tarball
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: tarball
+          path: ${{ steps.pack.outputs.tarball-name }}
+          if-no-files-found: error
+          retention-days: 7
+
+  provenance:
+    name: slsa v1.0 provenance
+    needs: [build]
+    permissions:
+      actions: read
+      contents: read
+      id-token: write
+    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_generic_slsa3.yml@f7dd8c54c2067bafc12ca7a55595d5ee9b75204a # v2.1.0
+    with:
+      base64-subjects: ${{ needs.build.outputs.tarball-sha256 }}
+      provenance-name: ${{ needs.build.outputs.tarball-name }}.intoto.jsonl
+      upload-assets: true
+
+  publish:
+    name: npm trusted publisher (--provenance)
+    needs: [build, provenance]
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: harden runner
+        uses: step-security/harden-runner@8d3c67de8e2fe68ef647c8db1e6a09f647780f40 # v2
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+
+      - name: download tarball
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: tarball
+
+      - name: publish
+        run: npm publish "${{ needs.build.outputs.tarball-name }}" --provenance --access public
+
+  sign:
+    name: cosign sign-blob (keyless)
+    needs: [build, publish]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - uses: sigstore/cosign-installer@cad07c2e89fa2edd6e2d7bab4c1aa38e53f76003 # v4.1.1
+
+      - name: download tarball
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: tarball
+
+      - name: sign
+        run: |
+          cosign sign-blob --yes \
+            --output-signature "${{ needs.build.outputs.tarball-name }}.sig" \
+            --output-certificate "${{ needs.build.outputs.tarball-name }}.crt" \
+            "${{ needs.build.outputs.tarball-name }}"
+
+      - name: attach signature to release
+        uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda # v3
+        with:
+          files: |
+            ${{ needs.build.outputs.tarball-name }}.sig
+            ${{ needs.build.outputs.tarball-name }}.crt

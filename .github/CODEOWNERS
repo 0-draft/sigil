@@ -1,0 +1,7 @@
+# every change requires review by a codeowner.
+# enforced via branch protection: require pr + 1 review + codeowner review.
+
+*                       @0-draft/maintainers
+.github/workflows/      @0-draft/security
+scripts/                @0-draft/security
+SECURITY.md             @0-draft/security

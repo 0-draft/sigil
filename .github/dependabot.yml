@@ -1,0 +1,16 @@
+# dependabot scope is intentionally narrow:
+# only github-actions, because sha-pinned action references go stale and
+# stale pins quietly carry old cves into every fork.
+# npm dependabot is a per-fork choice, not a template choice.
+
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 10
+    commit-message:
+      prefix: "ci"
+      include: scope
