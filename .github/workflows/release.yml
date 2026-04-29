@@ -26,6 +26,7 @@ jobs:
     outputs:
       tarball-name: ${{ steps.pack.outputs.tarball-name }}
       tarball-sha256: ${{ steps.pack.outputs.tarball-sha256 }}
+      subjects-base64: ${{ steps.pack.outputs.subjects-base64 }}
     steps:
       - name: harden runner
         uses: step-security/harden-runner@8d3c67de8e2fe68ef647c8db1e6a09f647780f40 # v2
@@ -54,8 +55,10 @@ jobs:
           set -euo pipefail
           tarball=$(npm pack --silent | tail -n 1)
           sha=$(shasum -a 256 "$tarball" | awk '{print $1}')
-          echo "tarball-name=$tarball" >>"$GITHUB_OUTPUT"
-          echo "tarball-sha256=$sha"   >>"$GITHUB_OUTPUT"
+          subjects=$(printf '%s  %s\n' "$sha" "$tarball" | base64 -w0)
+          echo "tarball-name=$tarball"        >>"$GITHUB_OUTPUT"
+          echo "tarball-sha256=$sha"          >>"$GITHUB_OUTPUT"
+          echo "subjects-base64=$subjects"    >>"$GITHUB_OUTPUT"
 
       - name: upload tarball
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
@@ -70,11 +73,11 @@ jobs:
     needs: [build]
     permissions:
       actions: read
-      contents: read
+      contents: write
       id-token: write
     uses: slsa-framework/slsa-github-generator/.github/workflows/generator_generic_slsa3.yml@f7dd8c54c2067bafc12ca7a55595d5ee9b75204a # v2.1.0
     with:
-      base64-subjects: ${{ needs.build.outputs.tarball-sha256 }}
+      base64-subjects: ${{ needs.build.outputs.subjects-base64 }}
       provenance-name: ${{ needs.build.outputs.tarball-name }}.intoto.jsonl
       upload-assets: true
 
