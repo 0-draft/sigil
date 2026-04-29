@@ -66,31 +66,60 @@ fi
 echo
 echo "==> next steps:"
 echo
-echo "  1. configure npm trusted publisher"
-echo "     https://docs.npmjs.com/trusted-publishers"
-echo "       repository:  $NEW_ORG/$NEW_REPO"
-echo "       workflow:    .github/workflows/release.yml"
-echo "       environment: release"
-echo
-echo "  2. create the github environment named 'release'"
+echo "  1. create the github environment named 'release'"
 echo "     gh api -X PUT repos/$NEW_ORG/$NEW_REPO/environments/release"
 echo
-echo "  3. apply branch protection on main (one shot, requires admin):"
+echo "  2. apply rulesets on main and on release tags (requires admin):"
 echo
 cat <<EOF
-       gh api -X PUT repos/$NEW_ORG/$NEW_REPO/branches/main/protection \\
-         -F required_pull_request_reviews.required_approving_review_count=1 \\
-         -F required_pull_request_reviews.dismiss_stale_reviews=true \\
-         -F required_pull_request_reviews.require_code_owner_reviews=true \\
-         -F required_status_checks.strict=true \\
-         -F 'required_status_checks.contexts[]=ci' \\
-         -F 'required_status_checks.contexts[]=pinned-actions' \\
-         -F enforce_admins=true \\
-         -F required_linear_history=true \\
-         -F required_signatures.enabled=true \\
-         -F allow_force_pushes=false \\
-         -F allow_deletions=false
+       gh api -X POST repos/$NEW_ORG/$NEW_REPO/rulesets --input - <<'JSON'
+       {
+         "name": "main protection",
+         "target": "branch",
+         "enforcement": "active",
+         "conditions": { "ref_name": { "include": ["~DEFAULT_BRANCH"], "exclude": [] } },
+         "rules": [
+           { "type": "deletion" },
+           { "type": "non_fast_forward" },
+           { "type": "required_linear_history" },
+           { "type": "required_signatures" },
+           { "type": "pull_request", "parameters": {
+               "required_approving_review_count": 1,
+               "dismiss_stale_reviews_on_push": true,
+               "require_code_owner_review": true,
+               "require_last_push_approval": false,
+               "required_review_thread_resolution": false
+           }},
+           { "type": "required_status_checks", "parameters": {
+               "required_status_checks": [
+                 { "context": "ci" },
+                 { "context": "pinned-actions" }
+               ],
+               "strict_required_status_checks_policy": true
+           }}
+         ]
+       }
+       JSON
+
+       gh api -X POST repos/$NEW_ORG/$NEW_REPO/rulesets --input - <<'JSON'
+       {
+         "name": "release tag protection",
+         "target": "tag",
+         "enforcement": "active",
+         "conditions": { "ref_name": { "include": ["refs/tags/v*"], "exclude": [] } },
+         "rules": [
+           { "type": "deletion" },
+           { "type": "non_fast_forward" }
+         ]
+       }
+       JSON
 EOF
+echo
+echo "  3. configure npm trusted publisher at npmjs.com:"
+echo "     https://docs.npmjs.com/trusted-publishers"
+echo "       repository:        $NEW_ORG/$NEW_REPO"
+echo "       workflow filename: release.yml"
+echo "       environment name:  release"
 echo
 echo "  4. commit the rewrite, push, watch ci go green."
 echo
