@@ -54,20 +54,18 @@ TARBALL="$(cd "$WORK" && npm pack "$SPEC" --silent | tail -n 1)"
 gh release download "v${VERSION}" \
   -R "$GH_REPO" \
   -D "$WORK" \
-  -p "${TARBALL}.sig" \
-  -p "${TARBALL}.crt" \
+  -p "${TARBALL}.sigstore.json" \
   -p "${TARBALL}.intoto.jsonl" 2>/dev/null || true
 
-if [ ! -f "$WORK/${TARBALL}.sig" ] || [ ! -f "$WORK/${TARBALL}.crt" ]; then
-  echo "    missing ${TARBALL}.sig / .crt on github release v${VERSION} of ${GH_REPO}"
+if [ ! -f "$WORK/${TARBALL}.sigstore.json" ]; then
+  echo "    missing ${TARBALL}.sigstore.json on github release v${VERSION} of ${GH_REPO}"
   exit 1
 fi
 
 cosign verify-blob \
   --certificate-identity-regexp "$EXPECTED_SUBJECT_REGEX" \
   --certificate-oidc-issuer "$EXPECTED_ISSUER" \
-  --certificate "$WORK/${TARBALL}.crt" \
-  --signature "$WORK/${TARBALL}.sig" \
+  --bundle "$WORK/${TARBALL}.sigstore.json" \
   "$WORK/${TARBALL}"
 echo "    ok"
 

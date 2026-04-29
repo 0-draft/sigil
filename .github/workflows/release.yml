@@ -134,15 +134,15 @@ jobs:
           name: tarball
 
       - name: sign
+        # cosign v4 emits a single sigstore bundle (.sigstore.json) by default;
+        # --output-signature / --output-certificate are deprecated and ignored.
         run: |
           cosign sign-blob --yes \
-            --output-signature "${{ needs.build.outputs.tarball-name }}.sig" \
-            --output-certificate "${{ needs.build.outputs.tarball-name }}.crt" \
+            --bundle "${{ needs.build.outputs.tarball-name }}.sigstore.json" \
             "${{ needs.build.outputs.tarball-name }}"
 
       - name: attach signature to release
         uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda # v3
         with:
           files: |
-            ${{ needs.build.outputs.tarball-name }}.sig
-            ${{ needs.build.outputs.tarball-name }}.crt
+            ${{ needs.build.outputs.tarball-name }}.sigstore.json
