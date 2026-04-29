@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 # check-pins.sh — fail if any `uses: owner/repo@<tag>` still references a tag
 # instead of a 40-character commit sha. run as a ci gate.
+#
+# exception: slsa-framework/slsa-github-generator reusable workflows must be
+# referenced by tag (e.g. @v2.1.0), not sha. internally the slsa builder uses
+# the ref as a vX.Y.Z release tag to fetch its pre-built binary; sha pinning
+# breaks that lookup. these refs are intentionally excluded.
 
 set -euo pipefail
 
@@ -20,6 +25,9 @@ for f in "${files[@]}"; do
     if [[ "$line" =~ ^[[:space:]]*-?[[:space:]]*uses:[[:space:]]*([^@[:space:]]+)@([^[:space:]#]+) ]]; then
       ref="${BASH_REMATCH[1]}"
       tag="${BASH_REMATCH[2]}"
+      if [[ "$ref" == slsa-framework/slsa-github-generator/* ]]; then
+        continue
+      fi
       if [[ ! "$tag" =~ ^[0-9a-f]{40}$ ]]; then
         echo "$f: $ref@$tag is not pinned to a sha"
         bad=$((bad + 1))

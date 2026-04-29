@@ -44,6 +44,14 @@ for f in "${files[@]}"; do
         continue
       fi
 
+      # slsa-github-generator reusable workflows must stay tag-pinned.
+      # the builder parses the ref as `refs/tags/vX.Y.Z` to fetch its binary;
+      # a sha breaks that lookup with "Invalid ref ... Expected refs/tags/vX.Y.Z".
+      if [[ "$ref_path" == slsa-framework/slsa-github-generator/* ]]; then
+        echo "$line" >>"$tmp"
+        continue
+      fi
+
       sha="$(resolve_sha "$owner_repo" "$tag")"
       if [[ ! "$sha" =~ ^[0-9a-f]{40}$ ]]; then
         echo "    warn: could not resolve $owner_repo@$tag (use a specific tag like v1.2.3) -- leaving as-is" >&2
