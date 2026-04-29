@@ -1,6 +1,6 @@
 {
   "name": "@0-draft/sigil",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "a github template for repos that ship under signature, end to end.",
   "type": "module",
   "main": "./dist/index.js",
